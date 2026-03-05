@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>💰 Bill Tracker Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0a08;
+    --card: #13120f;
+    --card2: #1a1814;
+    --gold: #c8a96e;
+    --gold2: #e2c47a;
+    --fg: #f0ead6;
+    --muted: #7a6e58;
+    --border: #2e2b22;
+    --red: #e07070;
+    --green: #6ec87a;
+    --mono: 'Share Tech Mono', monospace;
+    --serif: 'Cinzel', serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative; z-index: 10;
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px;
+    display: flex; align-items: center; gap: 16px;
+    background: linear-gradient(90deg, #0f0e0c 0%, #161410 100%);
+  }
+
+  header h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.3rem, 4vw, 1.8rem);
+    color: var(--gold);
+    letter-spacing: 2px;
+  }
+
+  header span {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-left: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+    padding: 20px 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; padding: 12px; gap: 14px; }
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .card-title {
+    font-family: var(--serif);
+    font-size: 0.78rem;
+    color: var(--gold);
+    letter-spacing: 2px;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card2);
+  }
+
+  /* ── FORM ── */
+  .form-group { padding: 10px 16px 4px; }
+  .form-group label {
+    display: block;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+
+  .form-group input {
+    width: 100%;
+    background: #070605;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  .form-group input:focus { border-color: var(--gold); }
+
+  .btn {
+    display: block;
+    width: calc(100% - 32px);
+    margin: 12px 16px;
+    padding: 12px;
+    border: none; border-radius: 4px;
+    font-family: var(--serif);
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: filter .15s, transform .1s;
+  }
+
+  .btn:active { transform: scale(0.98); }
+  .btn:hover { filter: brightness(1.1); }
+
+  .btn-gold { background: var(--gold); color: #0b0a08; }
+  .btn-outline { background: #1e1c16; color: var(--gold); border: 1px solid #3a3220; }
+  .btn-green { background: #162016; color: var(--green); border: 1px solid #2a3a2a; }
+  .btn-red { background: #1e1010; color: var(--red); border: 1px solid #3a2020; font-size:0.78rem; padding:8px; }
+
+  /* ── SUMMARY ── */
+  .summary-total {
+    text-align: center;
+    padding: 16px 16px 4px;
+  }
+  .summary-total .amount {
+    font-family: var(--serif);
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+    color: var(--gold);
+    font-weight: 700;
+  }
+  .summary-total .label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 3px;
+    margin-top: 2px;
+  }
+  .summary-total .count {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 6px;
+    margin-bottom: 10px;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 6px 16px; }
+
+  /* ── TABLE ── */
+  .right-col { display: flex; flex-direction: column; }
+  .table-wrap { overflow: auto; flex: 1; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  thead th {
+    font-family: var(--serif);
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    color: var(--gold);
+    background: var(--card2);
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky; top: 0;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #1c1a14;
+    cursor: pointer;
+    transition: background .12s;
+  }
+
+  tbody tr:nth-child(even) { background: #0f0e0b; }
+  tbody tr:hover { background: #211f18; }
+  tbody tr.selected { background: #2a2618 !important; outline: 1px solid #4a4230; }
+
+  tbody td {
+    padding: 10px 12px;
+    color: var(--fg);
+    white-space: nowrap;
+  }
+
+  tbody td.amt { color: var(--gold2); font-weight: 600; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+  }
+
+  /* ── BOTTOM BAR ── */
+  .table-footer {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--card2);
+  }
+
+  .table-footer button {
+    background: none; border: 1px solid #3a2020;
+    border-radius: 3px; color: var(--red);
+    font-family: var(--mono); font-size: 0.75rem;
+    padding: 5px 12px; cursor: pointer;
+    transition: background .12s;
+  }
+
+  .table-footer button:hover { background: #2a1414; }
+
+  .table-footer .status {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--card2); border: 1px solid var(--gold);
+    color: var(--gold); font-family: var(--serif);
+    font-size: 0.8rem; letter-spacing: 1px;
+    padding: 12px 28px; border-radius: 4px;
+    transition: transform .3s ease, opacity .3s;
+    opacity: 0; z-index: 9999; white-space: nowrap;
+  }
+
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.75); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--gold);
+    border-radius: 6px;
+    padding: 32px 40px;
+    text-align: center;
+    max-width: 380px; width: 90%;
+  }
+
+  .modal h2 { font-family: var(--serif); color: var(--gold); margin-bottom: 16px; font-size: 1.1rem; }
+  .modal p { color: var(--fg); font-size: 0.9rem; line-height: 1.8; }
+  .modal .row { display: flex; gap: 10px; margin-top: 22px; }
+  .modal .row button {
+    flex: 1; padding: 10px; border: none; border-radius: 3px;
+    font-family: var(--serif); font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; letter-spacing: 1px;
+  }
+  .modal .row .ok { background: var(--gold); color: #0b0a08; }
+  .modal .row .cancel { background: var(--border); color: var(--muted); }
+
+  /* ── FINAL BILL MODAL ── */
+  .final-bill {
+    font-family: var(--mono); text-align: left;
+    background: #070605; border-radius: 4px;
+    padding: 16px; margin-top: 14px;
+    font-size: 0.78rem; line-height: 2;
+    max-height: 260px; overflow-y: auto;
+    border: 1px solid var(--border);
+  }
+  .final-bill .fb-row { display: flex; justify-content: space-between; }
+  .final-bill .fb-divider { border-top: 1px dashed var(--border); margin: 4px 0; }
+  .final-bill .fb-total { color: var(--gold); font-weight: 700; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ── ANIMATION ── */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .card { animation: fadeIn .3s ease both; }
+  .card:nth-child(2) { animation-delay: .08s; }
+  .card:nth-child(3) { animation-delay: .14s; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💰 Bill Tracker Pro</h1>
+  <span>· ONLINE EDITION ·</span>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT COLUMN -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Add Bill -->
+    <div class="card">
+      <div class="card-title">➕ ADD NEW BILL</div>
+
+      <div class="form-group">
+        <label>DATE</label>
+        <input type="date" id="f-date"/>
+      </div>
+      <div class="form-group">
+        <label>TIME</label>
+        <input type="time" id="f-time"/>
+      </div>
+      <div class="form-group">
+        <label>BILL NAME / DESCRIPTION</label>
+        <input type="text" id="f-name" placeholder="e.g. Groceries, Electricity…" autocomplete="off"/>
+      </div>
+      <div class="form-group" style="margin-bottom:4px;">
+        <label>AMOUNT (₹)</label>
+        <input type="number" id="f-amount" min="0.01" step="0.01" placeholder="0.00"/>
+      </div>
+      <button class="btn btn-gold" onclick="saveBill()">💾 SAVE BILL</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="card">
+      <div class="card-title">🧾 SUMMARY</div>
+      <div class="summary-total">
+        <div class="amount" id="grand-total">₹ 0.00</div>
+        <div class="label">GRAND TOTAL</div>
+        <div class="count" id="bill-count">0 bills</div>
+      </div>
+      <div class="divider"></div>
+      <button class="btn btn-outline" onclick="showFinalBill()">🧮 GENERATE FINAL BILL</button>
+      <div class="divider"></div>
+      <button class="btn btn-green" onclick="exportExcel()">📊 EXPORT TO EXCEL (.xlsx)</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col card">
+    <div class="card-title">📋 ALL BILLS</div>
+    <div class="table-wrap" id="table-wrap">
+      <div class="empty-state" id="empty-msg">NO BILLS YET — ADD YOUR FIRST BILL</div>
+      <table id="bills-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>SR.</th>
+            <th>DATE</th>
+            <th>TIME</th>
+            <th>BILL NAME</th>
+            <th>AMOUNT (₹)</th>
+          </tr>
+        </thead>
+        <tbody id="bills-body"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <button onclick="deleteSelected()">🗑 Delete Selected</button>
+      <button onclick="clearAll()" style="border-color:#5a3030;color:#c86060;">🗑 Clear ALL</button>
+      <div class="status" id="status-bar">No bills yet.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Confirm Modal -->
+<div class="modal-backdrop" id="confirm-modal">
+  <div class="modal">
+    <h2 id="cm-title">Confirm</h2>
+    <p id="cm-msg">Are you sure?</p>
+    <div class="row">
+      <button class="cancel" onclick="closeConfirm()">CANCEL</button>
+      <button class="ok" id="cm-ok">YES, DELETE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Final Bill Modal -->
+<div class="modal-backdrop" id="final-modal">
+  <div class="modal" style="max-width:440px;">
+    <h2>🧾 FINAL BILL</h2>
+    <div class="final-bill" id="final-content"></div>
+    <div class="row">
+      <button class="ok" onclick="closeFinal()">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────
+let bills = [];
+let selectedIds = new Set();
+let idCounter = 1;
+
+// ── STORAGE ────────────────────────────────
+const STORAGE_KEY = 'billtracker-bills';
+
+async function loadBills() {
+  try {
+    const res = await window.storage.get(STORAGE_KEY);
+    if (res && res.value) {
+      const data = JSON.parse(res.value);
+      bills = data.bills || [];
+      idCounter = data.idCounter || 1;
+    }
+  } catch(e) {
+    // Fresh start
+    bills = []; idCounter = 1;
+  }
+  render();
+}
+
+async function saveBills() {
+  try {
+    await window.storage.set(STORAGE_KEY, JSON.stringify({ bills, idCounter }));
+  } catch(e) {
+    console.warn('Storage save failed', e);
+  }
+}
+
+// ── INIT ───────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  document.getElementById('f-date').value = now.toISOString().slice(0,10);
+  document.getElementById('f-time').value = now.toTimeString().slice(0,5);
+  document.getElementById('f-amount').addEventListener('keydown', e => { if(e.key==='Enter') saveBill(); });
+  document.getElementById('f-name').addEventListener('keydown', e => { if(e.key==='Enter') saveBill(); });
+  loadBills();
+});
+
+// ── SAVE BILL ──────────────────────────────
+function saveBill() {
+  const name   = document.getElementById('f-name').value.trim();
+  const amount = parseFloat(document.getElementById('f-amount').value);
+  const date   = document.getElementById('f-date').value;
+  const time   = document.getElementById('f-time').value;
+
+  if (!name) { toast('⚠ Please enter a bill name'); return; }
+  if (!amount || amount <= 0) { toast('⚠ Enter a valid amount'); return; }
+  if (!date) { toast('⚠ Please select a date'); return; }
+
+  bills.push({ id: idCounter++, date, time, name, amount });
+  saveBills();
+
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-name').focus();
+
+  render();
+  toast('✅ Bill saved!');
+}
+
+// ── RENDER ─────────────────────────────────
+function render() {
+  const tbody = document.getElementById('bills-body');
+  const table = document.getElementById('bills-table');
+  const empty = document.getElementById('empty-msg');
+
+  tbody.innerHTML = '';
+  selectedIds = new Set();
+
+  if (bills.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+  } else {
+    table.style.display = 'table';
+    empty.style.display = 'none';
+
+    bills.forEach((b, i) => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = b.id;
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${b.date}</td>
+        <td>${b.time || '—'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${escHtml(b.name)}</td>
+        <td class="amt">₹ ${Number(b.amount).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      `;
+      tr.addEventListener('click', () => toggleSelect(b.id, tr));
+      tbody.appendChild(tr);
+    });
+  }
+
+  updateSummary();
+}
+
+function toggleSelect(id, tr) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+    tr.classList.remove('selected');
+  } else {
+    selectedIds.add(id);
+    tr.classList.add('selected');
+  }
+}
+
+function updateSummary() {
+  const total = bills.reduce((s, b) => s + b.amount, 0);
+  document.getElementById('grand-total').textContent = '₹ ' + total.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('bill-count').textContent = `${bills.length} bill(s)`;
+  document.getElementById('status-bar').textContent =
+    bills.length === 0 ? 'No bills yet.' :
+    `${bills.length} bills  |  Total: ₹ ${total.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+}
+
+// ── DELETE ─────────────────────────────────
+function deleteSelected() {
+  if (selectedIds.size === 0) { toast('⚠ Select a bill to delete'); return; }
+  openConfirm(
+    'Delete Bills',
+    `Delete ${selectedIds.size} selected bill(s)?`,
+    () => {
+      bills = bills.filter(b => !selectedIds.has(b.id));
+      saveBills(); render();
+      toast(`🗑 ${selectedIds.size} bill(s) deleted`);
+    }
+  );
+}
+
+function clearAll() {
+  if (bills.length === 0) { toast('No bills to clear'); return; }
+  openConfirm('Clear ALL Bills', 'This will permanently delete ALL bills. Continue?', () => {
+    bills = []; idCounter = 1;
+    saveBills(); render();
+    toast('🗑 All bills cleared');
+  });
+}
+
+// ── FINAL BILL ─────────────────────────────
+function showFinalBill() {
+  if (bills.length === 0) { toast('⚠ No bills to show'); return; }
+  const total = bills.reduce((s, b) => s + b.amount, 0);
+  let html = '';
+  bills.forEach((b, i) => {
+    html += `<div class="fb-row"><span>${i+1}. ${escHtml(b.name)}</span><span>₹ ${Number(b.amount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span></div>`;
+  });
+  html += `<div class="fb-divider"></div>
+    <div class="fb-row fb-total">
+      <span>GRAND TOTAL (${bills.length} bills)</span>
+      <span>₹ ${total.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+    </div>`;
+  document.getElementById('final-content').innerHTML = html;
+  document.getElementById('final-modal').classList.add('open');
+}
+
+function closeFinal() { document.getElementById('final-modal').classList.remove('open'); }
+
+// ── EXPORT EXCEL ───────────────────────────
+function exportExcel() {
+  if (bills.length === 0) { toast('⚠ No bills to export'); return; }
+  if (typeof XLSX === 'undefined') { toast('⚠ XLSX library not loaded'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ['Sr. No.', 'Date', 'Time', 'Bill Name / Description', 'Amount (₹)'],
+    ...bills.map((b, i) => [i+1, b.date, b.time || '', b.name, b.amount]),
+    ['', '', '', `GRAND TOTAL (${bills.length} bills)`, bills.reduce((s,b)=>s+b.amount,0)]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [{ wch: 8 }, { wch: 14 }, { wch: 10 }, { wch: 40 }, { wch: 16 }];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Bills');
+  const now = new Date();
+  const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `Bills_${ts}.xlsx`);
+  toast('📊 Excel exported!');
+}
+
+// ── CONFIRM MODAL ──────────────────────────
+let confirmCallback = null;
+function openConfirm(title, msg, cb) {
+  document.getElementById('cm-title').textContent = title;
+  document.getElementById('cm-msg').textContent = msg;
+  confirmCallback = cb;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirm-modal').classList.remove('open'); }
+document.getElementById('cm-ok').addEventListener('click', () => {
+  closeConfirm();
+  if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+});
+
+// Click outside to close modals
+document.getElementById('confirm-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeConfirm(); });
+document.getElementById('final-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeFinal(); });
+
+// ── TOAST ──────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── UTILS ──────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
+
